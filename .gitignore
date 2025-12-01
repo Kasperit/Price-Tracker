@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+*.db
+venv/
+.venv/
+node_modules/
+dist/
+.vite/
+*.log
+
+# Deployment
+data/
+static/
