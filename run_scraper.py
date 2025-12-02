@@ -2,9 +2,13 @@
 import asyncio
 import argparse
 import logging
+import time
 
 from database.session import init_db
-from scheduler import initialize_stores, run_all_scrapers, run_scraper_for_store
+from scheduler import (
+    initialize_stores, run_all_scrapers, run_scraper_for_store,
+    write_scraping_report, format_duration
+)
 from database.session import SessionLocal
 from database.repository import StoreRepository
 
@@ -37,13 +41,19 @@ async def run_manual_scrape(store_name: str = None, limit: int = None):
             store = store_repo.get_by_name(store_name)
             if store:
                 logger.info(f"Running scraper for {store.name}")
-                await run_scraper_for_store(store.id, store.scraper_class, limit=limit)
+                start_time = time.time()
+                stats = await run_scraper_for_store(store.id, store.scraper_class, limit=limit)
+                stats['store'] = store.name
+                total_duration = time.time() - start_time
+                
+                # Write report for single store
+                write_scraping_report([stats], total_duration)
             else:
                 logger.error(f"Store not found: {store_name}")
         finally:
             db.close()
     else:
-        # Scrape all stores
+        # Scrape all stores (already writes report)
         await run_all_scrapers(limit=limit)
 
 

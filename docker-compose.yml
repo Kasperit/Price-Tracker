@@ -4,10 +4,11 @@ services:
     ports:
       - "80:8000"
     volumes:
-      # Persist database outside container
+      # Persist database and logs outside container
       - ./data:/app/data
     environment:
       - DATABASE_URL=sqlite:///./data/price_tracker.db
+      - DATA_DIR=/app/data
     restart: unless-stopped
 
   # Scheduler runs as a separate service
@@ -17,6 +18,7 @@ services:
       - ./data:/app/data
     environment:
       - DATABASE_URL=sqlite:///./data/price_tracker.db
+      - DATA_DIR=/app/data
     command: python scheduler.py
     restart: unless-stopped
     depends_on:

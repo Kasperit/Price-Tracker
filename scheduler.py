@@ -1,7 +1,10 @@
 """Scraping job runner and scheduler."""
 import asyncio
 import logging
+import os
+import time
 from datetime import datetime
+from pathlib import Path
 from typing import Type
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -20,6 +23,68 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Scraping logs directory
+LOGS_DIR = Path(os.getenv('DATA_DIR', '.')) / 'logs'
+
+
+def format_duration(seconds: float) -> str:
+    """Format duration in human-readable format."""
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    elif seconds < 3600:
+        minutes = seconds / 60
+        return f"{minutes:.1f}m"
+    else:
+        hours = seconds / 3600
+        return f"{hours:.2f}h"
+
+
+def write_scraping_report(store_stats: list[dict], total_duration: float):
+    """Write scraping statistics to a log file."""
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    log_file = LOGS_DIR / f'scraping_report_{timestamp}.log'
+    
+    with open(log_file, 'w', encoding='utf-8') as f:
+        f.write("=" * 60 + "\n")
+        f.write(f"SCRAPING REPORT - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write("=" * 60 + "\n\n")
+        
+        f.write("STORE STATISTICS:\n")
+        f.write("-" * 60 + "\n")
+        f.write(f"{'Store':<25} {'Products':>10} {'Errors':>8} {'Duration':>12}\n")
+        f.write("-" * 60 + "\n")
+        
+        total_products = 0
+        total_errors = 0
+        
+        for stat in store_stats:
+            f.write(f"{stat['store']:<25} {stat['products']:>10} {stat['errors']:>8} {format_duration(stat['duration']):>12}\n")
+            total_products += stat['products']
+            total_errors += stat['errors']
+        
+        f.write("-" * 60 + "\n")
+        f.write(f"{'TOTAL':<25} {total_products:>10} {total_errors:>8} {format_duration(total_duration):>12}\n")
+        f.write("=" * 60 + "\n\n")
+        
+        # Detailed breakdown
+        f.write("DETAILED BREAKDOWN:\n")
+        f.write("-" * 60 + "\n")
+        for stat in store_stats:
+            f.write(f"\n{stat['store']}:\n")
+            f.write(f"  - Products scraped: {stat['products']}\n")
+            f.write(f"  - Errors: {stat['errors']}\n")
+            f.write(f"  - Duration: {format_duration(stat['duration'])} ({stat['duration']:.2f} seconds)\n")
+            if stat['products'] > 0:
+                avg_time = stat['duration'] / stat['products'] * 1000  # ms per product
+                f.write(f"  - Avg time per product: {avg_time:.1f}ms\n")
+        
+        f.write("\n" + "=" * 60 + "\n")
+    
+    logger.info(f"Scraping report written to: {log_file}")
+    return log_file
 
 # Registry of available scrapers
 SCRAPER_REGISTRY: dict[str, Type[BaseScraper]] = {
@@ -71,14 +136,20 @@ def initialize_stores():
         db.close()
 
 
-async def run_scraper_for_store(store_id: int, scraper_class: str, limit: int = None):
-    """Run scraper for a specific store and save results to database."""
+async def run_scraper_for_store(store_id: int, scraper_class: str, limit: int = None) -> dict:
+    """Run scraper for a specific store and save results to database.
+    
+    Returns:
+        dict with 'products', 'errors', and 'duration' keys
+    """
     logger.info(f"Starting scraping for store ID {store_id} with {scraper_class}" + (f" (limit: {limit})" if limit else ""))
+    
+    start_time = time.time()
     
     scraper_cls = SCRAPER_REGISTRY.get(scraper_class)
     if not scraper_cls:
         logger.error(f"Unknown scraper class: {scraper_class}")
-        return
+        return {'products': 0, 'errors': 0, 'duration': 0}
     
     db = SessionLocal()
     product_repo = ProductRepository(db)
@@ -128,14 +199,20 @@ async def run_scraper_for_store(store_id: int, scraper_class: str, limit: int = 
     finally:
         db.close()
     
-    logger.info(f"Completed scraping for store ID {store_id}: {products_scraped} products, {errors} errors")
+    duration = time.time() - start_time
+    logger.info(f"Completed scraping for store ID {store_id}: {products_scraped} products, {errors} errors in {format_duration(duration)}")
+    
+    return {'products': products_scraped, 'errors': errors, 'duration': duration}
 
 
 async def run_all_scrapers(limit: int = None):
     """Run scrapers for all active stores."""
     logger.info("=" * 50)
-    logger.info(f"Starting monthly scraping job at {datetime.now()}")
+    logger.info(f"Starting bi-weekly scraping job at {datetime.now()}")
     logger.info("=" * 50)
+    
+    total_start_time = time.time()
+    store_stats = []
     
     db = SessionLocal()
     try:
@@ -144,10 +221,17 @@ async def run_all_scrapers(limit: int = None):
         
         for store in stores:
             logger.info(f"Processing store: {store.name}")
-            await run_scraper_for_store(store.id, store.scraper_class, limit=limit)
+            stats = await run_scraper_for_store(store.id, store.scraper_class, limit=limit)
+            stats['store'] = store.name
+            store_stats.append(stats)
             
     finally:
         db.close()
+    
+    total_duration = time.time() - total_start_time
+    
+    # Write scraping report
+    write_scraping_report(store_stats, total_duration)
     
     # Cleanup: remove products without price data
     db = SessionLocal()
@@ -161,6 +245,7 @@ async def run_all_scrapers(limit: int = None):
     
     logger.info("=" * 50)
     logger.info(f"Bi-weekly scraping job completed at {datetime.now()}")
+    logger.info(f"Total duration: {format_duration(total_duration)}")
     logger.info("=" * 50)
 
 
