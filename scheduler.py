@@ -149,8 +149,18 @@ async def run_all_scrapers(limit: int = None):
     finally:
         db.close()
     
+    # Cleanup: remove products without price data
+    db = SessionLocal()
+    try:
+        product_repo = ProductRepository(db)
+        deleted_count = product_repo.delete_products_without_prices()
+        if deleted_count > 0:
+            logger.info(f"Cleaned up {deleted_count} products without price data")
+    finally:
+        db.close()
+    
     logger.info("=" * 50)
-    logger.info(f"Monthly scraping job completed at {datetime.now()}")
+    logger.info(f"Bi-weekly scraping job completed at {datetime.now()}")
     logger.info("=" * 50)
 
 

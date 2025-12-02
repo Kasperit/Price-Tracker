@@ -118,6 +118,25 @@ class ProductRepository:
         self.db.commit()
         self.db.refresh(product)
         return product
+    
+    def delete_products_without_prices(self) -> int:
+        """Delete all products that have no price history entries.
+        
+        Returns:
+            Number of products deleted
+        """
+        # Find products with no price history
+        from sqlalchemy import exists
+        products_without_prices = self.db.query(Product).filter(
+            ~exists().where(PriceHistory.product_id == Product.id)
+        ).all()
+        
+        count = len(products_without_prices)
+        for product in products_without_prices:
+            self.db.delete(product)
+        
+        self.db.commit()
+        return count
 
 
 class PriceHistoryRepository:
