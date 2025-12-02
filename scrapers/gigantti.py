@@ -81,7 +81,7 @@ class GiganttiAPIScraper(BaseScraper):
         try:
             client = await self._get_client()
             
-            # Fetch product card data
+            # Fetch product card data (contains all info including price)
             card_url = self.API_PRODUCT_CARD.format(product_id=product_id)
             card_response = await client.get(card_url)
             
@@ -93,14 +93,6 @@ class GiganttiAPIScraper(BaseScraper):
             
             # The API response wraps data in a 'data' key
             product_data = card_data.get('data', card_data)
-            
-            # Fetch price data
-            price_url = self.API_PRICE.format(product_id=product_id)
-            price_response = await client.get(price_url)
-            
-            price_data = None
-            if price_response.status_code == 200:
-                price_data = price_response.json()
             
             # Extract product information from card data
             name = product_data.get('name') or product_data.get('title')
@@ -128,18 +120,9 @@ class GiganttiAPIScraper(BaseScraper):
                 elif isinstance(original, (int, float)):
                     original_price = float(original)
             
-            # Fallback to price API data if needed
-            if not price and price_data:
-                price_info = price_data.get('data', price_data).get('price', price_data.get('data', price_data))
-                if isinstance(price_info, dict):
-                    current = price_info.get('current')
-                    if isinstance(current, list) and len(current) > 0:
-                        price = float(current[0])
-                    elif isinstance(current, (int, float)):
-                        price = float(current)
-            
+            # Skip products without price (likely out of stock)
             if not price:
-                logger.warning(f"No price found for product {product_id}")
+                logger.debug(f"Skipping product {product_id} - no price data (likely out of stock)")
                 return None
             
             # Ensure price is float
