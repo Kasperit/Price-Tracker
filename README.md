@@ -1,6 +1,6 @@
 # Price Tracker - Finnish Electronics Stores
 
-A web application for tracking product prices from Finnish electronics stores (Verkkokauppa.com, Gigantti.fi, and Power.fi). Scrapes prices monthly and provides a searchable UI to view price history.
+A web application for tracking product prices from Finnish electronics stores (Verkkokauppa.com, Gigantti.fi, and Power.fi). Scrapes prices bi-weekly and provides a searchable UI to view price history.
 
 ## Features
 
@@ -9,6 +9,7 @@ A web application for tracking product prices from Finnish electronics stores (V
 - 📈 **Price Charts**: Visualize price trends with interactive charts
 - 🏪 **Multi-Store Support**: Verkkokauppa.com, Gigantti.fi, and Power.fi
 - 🔌 **Extensible Architecture**: Easy to add new stores
+- 🧹 **Auto Cleanup**: Products without price data are automatically removed
 
 ## Architecture
 
@@ -30,7 +31,8 @@ A web application for tracking product prices from Finnish electronics stores (V
 │   └── src/
 │       ├── components/  # React components
 │       └── pages/       # Page components
-├── scheduler.py          # Monthly scraping scheduler
+├── scheduler.py          # Bi-weekly scraping scheduler
+├── cleanup_db.py         # Database cleanup script
 └── run_scraper.py       # Manual scraping script
 ```
 
@@ -98,42 +100,73 @@ python run_scraper.py --store "Gigantti" --limit 5
 
 ### Scheduled Scraping
 
-Run the scheduler to automatically scrape on the 1st of each month:
+Run the scheduler to automatically scrape on the 1st and 15th of each month at 3:00 AM:
 ```powershell
 python scheduler.py
 ```
 
 ### API Endpoints
 
-- `GET /api/stores` - List all stores
-- `GET /api/products/search?q=<query>` - Search products
-- `GET /api/products/{id}` - Get product details with price history
+**Stores:**
+- `GET /api/stores` - List all active stores
+- `GET /api/stores/{id}` - Get store by ID
+
+**Products:**
+- `GET /api/products` - List all products (paginated, optional `store_id` filter)
+- `GET /api/products/search?q=<query>` - Search products by name
+- `GET /api/products/{id}` - Get product details with full price history
 - `GET /api/products/{id}/history` - Get price history only
-- `GET /api/products/{id}/statistics` - Get price statistics
+- `GET /api/products/{id}/statistics` - Get price statistics (min, max, avg, change)
 
 ## Adding a New Store
 
 1. Create a new scraper class in `scrapers/`:
 
 ```python
-from scrapers.base import BaseScraper, ScrapedProduct
+from typing import AsyncGenerator, Optional
+import httpx
+from scrapers.base import BaseScraper, ScrapedProduct, SitemapParser
 
 class NewStoreScraper(BaseScraper):
     STORE_NAME = "New Store"
     BASE_URL = "https://newstore.fi"
     SITEMAP_URL = "https://newstore.fi/sitemap.xml"
+    API_URL = "https://newstore.fi/api/products"
     
-    async def handle_cookie_consent(self, page):
-        # Handle cookie popup
-        pass
+    async def get_product_urls(self) -> AsyncGenerator[str, None]:
+        """Get product URLs from sitemap."""
+        urls = await SitemapParser.get_urls_from_sitemap(
+            self.SITEMAP_URL,
+            url_filter='/product/'
+        )
+        for url in urls:
+            yield url
     
-    async def get_product_urls(self):
-        # Yield product URLs from sitemap
-        pass
+    async def scrape_all_products(self) -> AsyncGenerator[ScrapedProduct, None]:
+        """Scrape all products using the store's API."""
+        async with httpx.AsyncClient() as client:
+            async for url in self.get_product_urls():
+                product_id = self.extract_product_id(url)
+                response = await client.get(f"{self.API_URL}/{product_id}")
+                if response.status_code == 200:
+                    data = response.json()
+                    yield ScrapedProduct(
+                        external_id=product_id,
+                        name=data['name'],
+                        url=url,
+                        price=float(data['price']),
+                        original_price=data.get('original_price'),
+                        brand=data.get('brand'),
+                        image_url=data.get('image'),
+                        is_available=data.get('in_stock', True)
+                    )
     
-    async def scrape_product(self, page, url):
-        # Return ScrapedProduct
-        pass
+    @staticmethod
+    def extract_product_id(url: str) -> Optional[str]:
+        """Extract product ID from URL."""
+        import re
+        match = re.search(r'/product/(\d+)', url)
+        return match.group(1) if match else None
 ```
 
 2. Register in `scrapers/__init__.py`
@@ -147,10 +180,11 @@ class NewStoreScraper(BaseScraper):
 - **Database**: SQLite (easily switchable to PostgreSQL)
 - **Scheduling**: APScheduler
 
-## Deployment (Hetzner VPS)
+## Deployment (Hetzner Cloud)
 
 ### Prerequisites
-- Hetzner VPS with Ubuntu 22.04 (CX11 ~€4.50/month is sufficient)
+- Hetzner Cloud VPS (CX23 in Helsinki ~€3.49/month recommended)
+- SSH key for authentication
 - Domain name (optional)
 
 ### Setup SSH Key (for private repos)
@@ -213,11 +247,23 @@ docker compose up -d --build
 # View logs
 docker compose logs -f
 
+# View scraper logs
+docker logs -f price-tracker-scheduler-1
+
 # Restart services
 docker compose restart
 
 # Run manual scrape
+docker compose exec web python run_scraper.py
+
+# Run manual scrape with limit (for testing)
 docker compose exec web python run_scraper.py --limit 10
+
+# Cleanup products without prices
+docker compose exec web python cleanup_db.py
+
+# Check product count
+docker compose exec web python -c "from database.session import SessionLocal; from database.models import Product; db = SessionLocal(); print('Products:', db.query(Product).count())"
 
 # Backup database
 cp data/price_tracker.db ~/backups/backup_$(date +%Y%m%d).db
