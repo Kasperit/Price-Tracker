@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { searchProducts, getProducts, getStores, Store, ProductListItem, SearchResponse } from '../api';
+import { searchProducts, getProducts, getStores, Store, SearchResponse } from '../api';
 import ProductCard from '../components/ProductCard';
 
 function HomePage() {
