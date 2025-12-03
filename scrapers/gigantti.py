@@ -1,4 +1,5 @@
 """Gigantti.fi API-based scraper implementation."""
+import asyncio
 import logging
 import re
 from typing import Optional, AsyncGenerator
@@ -8,6 +9,9 @@ import httpx
 from .base import BaseScraper, ScrapedProduct, SitemapParser
 
 logger = logging.getLogger(__name__)
+
+# Concurrency settings for Gigantti API
+CONCURRENT_REQUESTS = 50  # Number of parallel requests
 
 
 class GiganttiAPIScraper(BaseScraper):
@@ -194,26 +198,42 @@ class GiganttiAPIScraper(BaseScraper):
             return None
     
     async def scrape_all_products(self) -> AsyncGenerator[ScrapedProduct, None]:
-        """Scrape all products from the sitemap using API."""
+        """Scrape all products from the sitemap using API with concurrent requests."""
         logger.info("Starting API-based scrape of all Gigantti products")
+        logger.info(f"Using {CONCURRENT_REQUESTS} concurrent requests")
         
         count = 0
         errors = 0
         
+        # Collect all product IDs first
+        product_ids = []
         async for url in self.get_product_urls():
             product_id = self.extract_product_id(url)
-            if not product_id:
-                continue
+            if product_id:
+                product_ids.append(product_id)
+        
+        logger.info(f"Collected {len(product_ids)} product IDs to scrape")
+        
+        # Process in batches with concurrent requests
+        for i in range(0, len(product_ids), CONCURRENT_REQUESTS):
+            batch = product_ids[i:i + CONCURRENT_REQUESTS]
             
-            product = await self._fetch_product_by_id(product_id)
-            if product:
-                count += 1
-                yield product
-                
-                if count % 100 == 0:
-                    logger.info(f"Scraped {count} products...")
-            else:
-                errors += 1
+            # Fetch all products in this batch concurrently
+            tasks = [self._fetch_product_by_id(pid) for pid in batch]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            for result in results:
+                if isinstance(result, Exception):
+                    logger.error(f"Batch request error: {result}")
+                    errors += 1
+                elif result is not None:
+                    count += 1
+                    yield result
+                else:
+                    errors += 1
+            
+            if count % 500 == 0 and count > 0:
+                logger.info(f"Scraped {count} products...")
         
         logger.info(f"Completed scraping. Success: {count}, Errors: {errors}")
         
