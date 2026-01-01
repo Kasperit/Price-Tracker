@@ -5,9 +5,12 @@ A web application for tracking product prices from Finnish electronics stores (V
 ## Features
 
 - 📊 **Price History Tracking**: Track prices over time for products
-- 🔍 **Product Search**: Search across all tracked products
+- 🔍 **Smart Search**: Search across all tracked products with debounced input (minimum 2 characters)
 - 📈 **Price Charts**: Visualize price trends with interactive charts
+- 🔀 **Flexible Sorting**: Sort products by name (A-Z), price (low to high, high to low)
 - 🏪 **Multi-Store Support**: Verkkokauppa.com, Gigantti.fi, and Power.fi
+- 🏷️ **Store Filtering**: Filter products by specific store
+- 🔄 **Navigation Memory**: Preserves your page position and scroll when navigating back from product details
 - 🔌 **Extensible Architecture**: Easy to add new stores
 - 🧹 **Auto Cleanup**: Products without price data are automatically removed
 
@@ -37,6 +40,15 @@ A web application for tracking product prices from Finnish electronics stores (V
 ```
 
 ## Setup
+
+### Quick Start (Windows)
+
+Run both backend and frontend simultaneously:
+```powershell
+.\start.ps1
+```
+
+This will open two terminal windows - one for the backend API and one for the frontend dev server.
 
 ### Backend
 
@@ -112,8 +124,10 @@ python scheduler.py
 - `GET /api/stores/{id}` - Get store by ID
 
 **Products:**
-- `GET /api/products` - List all products (paginated, optional `store_id` filter)
+- `GET /api/products` - List all products (paginated, optional `store_id` and `sort_by` filters)
+  - Query params: `page`, `limit`, `store_id`, `sort_by` (name, price_asc, price_desc)
 - `GET /api/products/search?q=<query>` - Search products by name
+  - Query params: `q`, `page`, `limit`, `store_id`, `sort_by` (name, price_asc, price_desc)
 - `GET /api/products/{id}` - Get product details with full price history
 - `GET /api/products/{id}/history` - Get price history only
 - `GET /api/products/{id}/statistics` - Get price statistics (min, max, avg, change)
