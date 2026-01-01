@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { getProduct, getProductStatistics, ProductDetail, PriceStatistics } from '../api';
 import PriceChart from '../components/PriceChart';
 
@@ -58,7 +58,7 @@ function ProductPage() {
   if (error || !product) {
     return (
       <div>
-        <Link to="/" className="back-link">← Back to search</Link>
+        <button onClick={() => window.history.back()} className="back-link">← Back to search</button>
         <div className="error-message">{error || 'Product not found'}</div>
       </div>
     );
@@ -68,7 +68,7 @@ function ProductPage() {
 
   return (
     <div>
-      <Link to="/" className="back-link">← Back to search</Link>
+      <button onClick={() => window.history.back()} className="back-link">← Back to search</button>
 
       <div className="product-detail">
         <div className="product-detail-image">
