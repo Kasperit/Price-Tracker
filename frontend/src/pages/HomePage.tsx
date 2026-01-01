@@ -162,7 +162,7 @@ function HomePage() {
       if (newQuery.length >= 2 || newQuery.length === 0) {
         updateURLParams({ q: newQuery || null, page: null });
       }
-    }, 300);
+    }, 800);
   };
 
   return (
