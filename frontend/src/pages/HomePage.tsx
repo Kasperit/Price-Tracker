@@ -157,9 +157,11 @@ function HomePage() {
 
   const handleQueryChange = (newQuery: string) => {
     setQuery(newQuery);
-    // Debounce URL update
+    // Debounce URL update - only update if 2+ characters or empty
     setTimeout(() => {
-      updateURLParams({ q: newQuery || null, page: null });
+      if (newQuery.length >= 2 || newQuery.length === 0) {
+        updateURLParams({ q: newQuery || null, page: null });
+      }
     }, 300);
   };
 
