@@ -83,11 +83,15 @@ function HomePage() {
 
   // Load products when params change
   useEffect(() => {
+    const page = parseInt(searchParams.get('page') || '1');
+    const sort = searchParams.get('sort') || 'name';
+    const store = searchParams.get('store') ? parseInt(searchParams.get('store')!) : null;
     const q = searchParams.get('q');
+    
     if (q && q.length >= 1) {
-      performSearch(q, selectedStore, currentPage, sortBy);
+      performSearch(q, store, page, sort);
     } else {
-      loadAllProducts(selectedStore, currentPage, sortBy);
+      loadAllProducts(store, page, sort);
     }
   }, [searchParams]);
 
