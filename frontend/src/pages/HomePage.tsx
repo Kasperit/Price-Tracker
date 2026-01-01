@@ -3,6 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import { searchProducts, getProducts, getStores, Store, SearchResponse } from '../api';
 import ProductCard from '../components/ProductCard';
 
+// Cache for search results to avoid re-fetching when navigating back
+const resultsCache = new Map<string, SearchResponse>();
+
 function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const scrollPositions = useRef<Map<string, number>>(new Map());
@@ -90,20 +93,32 @@ function HomePage() {
     const store = searchParams.get('store') ? parseInt(searchParams.get('store')!) : null;
     const q = searchParams.get('q');
     
+    // Create cache key
+    const cacheKey = `${q || 'all'}_${store || 'all'}_${page}_${sort}`;
+    
+    // Check if we have cached results
+    const cachedResults = resultsCache.get(cacheKey);
+    if (cachedResults) {
+      setResults(cachedResults);
+      setLoading(false);
+      return;
+    }
+    
     if (q && q.length >= 2) {
-      performSearch(q, store, page, sort);
+      performSearch(q, store, page, sort, cacheKey);
     } else {
-      loadAllProducts(store, page, sort);
+      loadAllProducts(store, page, sort, cacheKey);
     }
   }, [searchParams]);
 
-  const loadAllProducts = async (storeId: number | null, page: number, sort: string) => {
+  const loadAllProducts = async (storeId: number | null, page: number, sort: string, cacheKey: string) => {
     setLoading(true);
     setError(null);
     
     try {
       const data = await getProducts(storeId || undefined, page, 20, sort);
       setResults(data);
+      resultsCache.set(cacheKey, data);
     } catch (err) {
       setError('Failed to load products. Please try again.');
       console.error(err);
@@ -112,13 +127,14 @@ function HomePage() {
     }
   };
 
-  const performSearch = async (q: string, storeId: number | null, page: number, sort: string) => {
+  const performSearch = async (q: string, storeId: number | null, page: number, sort: string, cacheKey: string) => {
     setLoading(true);
     setError(null);
     
     try {
       const data = await searchProducts(q, storeId || undefined, page, 20, sort);
       setResults(data);
+      resultsCache.set(cacheKey, data);
     } catch (err) {
       setError('Failed to search products. Please try again.');
       console.error(err);
