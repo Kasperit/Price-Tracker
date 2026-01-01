@@ -88,7 +88,7 @@ function HomePage() {
     const store = searchParams.get('store') ? parseInt(searchParams.get('store')!) : null;
     const q = searchParams.get('q');
     
-    if (q && q.length >= 1) {
+    if (q && q.length >= 2) {
       performSearch(q, store, page, sort);
     } else {
       loadAllProducts(store, page, sort);
