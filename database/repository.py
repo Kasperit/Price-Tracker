@@ -60,16 +60,36 @@ class ProductRepository:
     def get_all(self, store_id: Optional[int] = None, 
                 limit: int = 50, offset: int = 0, sort_by: str = "name") -> list[Product]:
         """Get all products with optional store filter."""
-        q = self.db.query(Product)
-        if store_id:
-            q = q.filter(Product.store_id == store_id)
+        from sqlalchemy import select
+        from sqlalchemy.orm import aliased
         
-        # Apply sorting
-        if sort_by == "price_asc":
-            q = q.outerjoin(PriceHistory).group_by(Product.id).order_by(func.max(PriceHistory.scraped_at).desc(), func.max(PriceHistory.price).asc())
-        elif sort_by == "price_desc":
-            q = q.outerjoin(PriceHistory).group_by(Product.id).order_by(func.max(PriceHistory.scraped_at).desc(), func.max(PriceHistory.price).desc())
-        else:  # name or default
+        if sort_by in ["price_asc", "price_desc"]:
+            # Subquery to get the latest price for each product
+            latest_price_subq = (
+                select(
+                    PriceHistory.product_id,
+                    PriceHistory.price
+                )
+                .distinct(PriceHistory.product_id)
+                .order_by(PriceHistory.product_id, PriceHistory.scraped_at.desc())
+            ).subquery()
+            
+            q = self.db.query(Product).outerjoin(
+                latest_price_subq,
+                Product.id == latest_price_subq.c.product_id
+            )
+            
+            if store_id:
+                q = q.filter(Product.store_id == store_id)
+            
+            if sort_by == "price_asc":
+                q = q.order_by(latest_price_subq.c.price.asc().nullslast())
+            else:  # price_desc
+                q = q.order_by(latest_price_subq.c.price.desc().nullslast())
+        else:
+            q = self.db.query(Product)
+            if store_id:
+                q = q.filter(Product.store_id == store_id)
             q = q.order_by(Product.name)
         
         return q.offset(offset).limit(limit).all()
@@ -84,18 +104,38 @@ class ProductRepository:
     def search(self, query: str, store_id: Optional[int] = None, 
                limit: int = 50, offset: int = 0, sort_by: str = "name") -> list[Product]:
         """Search products by name."""
-        q = self.db.query(Product).filter(
-            Product.name.ilike(f"%{query}%")
-        )
-        if store_id:
-            q = q.filter(Product.store_id == store_id)
+        from sqlalchemy import select
+        from sqlalchemy.orm import aliased
         
-        # Apply sorting
-        if sort_by == "price_asc":
-            q = q.outerjoin(PriceHistory).group_by(Product.id).order_by(func.max(PriceHistory.scraped_at).desc(), func.max(PriceHistory.price).asc())
-        elif sort_by == "price_desc":
-            q = q.outerjoin(PriceHistory).group_by(Product.id).order_by(func.max(PriceHistory.scraped_at).desc(), func.max(PriceHistory.price).desc())
-        else:  # name or default
+        if sort_by in ["price_asc", "price_desc"]:
+            # Subquery to get the latest price for each product
+            latest_price_subq = (
+                select(
+                    PriceHistory.product_id,
+                    PriceHistory.price
+                )
+                .distinct(PriceHistory.product_id)
+                .order_by(PriceHistory.product_id, PriceHistory.scraped_at.desc())
+            ).subquery()
+            
+            q = self.db.query(Product).outerjoin(
+                latest_price_subq,
+                Product.id == latest_price_subq.c.product_id
+            ).filter(Product.name.ilike(f"%{query}%"))
+            
+            if store_id:
+                q = q.filter(Product.store_id == store_id)
+            
+            if sort_by == "price_asc":
+                q = q.order_by(latest_price_subq.c.price.asc().nullslast())
+            else:  # price_desc
+                q = q.order_by(latest_price_subq.c.price.desc().nullslast())
+        else:
+            q = self.db.query(Product).filter(
+                Product.name.ilike(f"%{query}%")
+            )
+            if store_id:
+                q = q.filter(Product.store_id == store_id)
             q = q.order_by(Product.name)
         
         return q.offset(offset).limit(limit).all()
