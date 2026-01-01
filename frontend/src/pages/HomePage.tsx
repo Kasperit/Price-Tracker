@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { searchProducts, getProducts, getStores, Store, SearchResponse } from '../api';
 import ProductCard from '../components/ProductCard';
@@ -6,47 +6,49 @@ import ProductCard from '../components/ProductCard';
 function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
-  
-  // Check if returning from product page with saved state
-  const hasLocationState = location.state && (location.state as any)?.page;
-  
-  // Restore state from location state if returning from product page, otherwise use URL params
-  const initialPage = hasLocationState 
-    ? (location.state as any).page 
-    : parseInt(searchParams.get('page') || '1');
-  const initialSortBy = hasLocationState
-    ? (location.state as any).sortBy
-    : (searchParams.get('sort') || 'name');
-  const initialScrollY = hasLocationState ? (location.state as any).scrollY : 0;
+  const scrollPositions = useRef<Map<string, number>>(new Map());
   
   const [query, setQuery] = useState(searchParams.get('q') || '');
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStore, setSelectedStore] = useState<number | null>(
     searchParams.get('store') ? parseInt(searchParams.get('store')!) : null
   );
-  const [sortBy, setSortBy] = useState<string>(initialSortBy);
+  const [sortBy, setSortBy] = useState<string>(searchParams.get('sort') || 'name');
   const [results, setResults] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(initialPage);
-  const [isRestoringState, setIsRestoringState] = useState(hasLocationState);
+  const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page') || '1'));
+  const firstRender = useRef(true);
 
-  // Restore scroll position when returning from product page
+  // Save scroll position before leaving
   useEffect(() => {
-    if (initialScrollY > 0 && isRestoringState) {
-      // Wait for content to load before scrolling
-      setTimeout(() => {
-        window.scrollTo(0, initialScrollY);
-        // Clear the scroll position from location state
-        window.history.replaceState({}, '');
-        setIsRestoringState(false);
-      }, 100);
-    } else if (hasLocationState) {
-      // Clear location state even if no scroll
-      window.history.replaceState({}, '');
-      setIsRestoringState(false);
+    const handleScroll = () => {
+      const key = `${query}_${selectedStore}_${currentPage}_${sortBy}`;
+      scrollPositions.current.set(key, window.scrollY);
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [query, selectedStore, currentPage, sortBy]);
+
+  // Restore scroll position when page loads
+  useEffect(() => {
+    if (!loading && results) {
+      const key = `${query}_${selectedStore}_${currentPage}_${sortBy}`;
+      const savedScroll = scrollPositions.current.get(key);
+      
+      if (savedScroll !== undefined) {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, savedScroll);
+        });
+      } else if (!firstRender.current) {
+        // New page/filter - scroll to top
+        window.scrollTo(0, 0);
+      }
+      
+      firstRender.current = false;
     }
-  }, [results]); // Trigger when results load
+  }, [loading, results, query, selectedStore, currentPage, sortBy]);
 
   // Load stores on mount
   useEffect(() => {
@@ -55,52 +57,29 @@ function HomePage() {
       .catch((err) => console.error('Failed to load stores:', err));
   }, []);
 
-  // Debounced search - triggers when query changes
+  // Sync state with URL params
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      // Don't reset page if we're restoring state
-      if (!isRestoringState) {
-        setCurrentPage(1);
-      }
-      const params: any = {};
-      if (query.length >= 1) {
-        params.q = query;
-      }
-      if (selectedStore) {
-        params.store = selectedStore.toString();
-      }
-      if (sortBy !== 'name') {
-        params.sort = sortBy;
-      }
-      if (currentPage > 1 && !isRestoringState) {
-        params.page = currentPage.toString();
-      }
-      if (Object.keys(params).length > 0) {
-        setSearchParams(params, { replace: isRestoringState });
-      } else {
-        setSearchParams({}, { replace: isRestoringState });
-      }
-    }, 300); // 300ms debounce
+    const page = parseInt(searchParams.get('page') || '1');
+    const sort = searchParams.get('sort') || 'name';
+    const store = searchParams.get('store') ? parseInt(searchParams.get('store')!) : null;
+    const q = searchParams.get('q') || '';
+    
+    setCurrentPage(page);
+    setSortBy(sort);
+    setSelectedStore(store);
+    setQuery(q);
+  }, [searchParams]);
 
-    return () => clearTimeout(timeoutId);
-  }, [query]);
-
-  // Update URL params when filters change (but not during state restoration)
+  // Restore scroll position when navigating back
   useEffect(() => {
-    if (isRestoringState) return; // Skip URL update during restoration
-    
-    const params: any = {};
-    if (query) params.q = query;
-    if (selectedStore) params.store = selectedStore.toString();
-    if (currentPage > 1) params.page = currentPage.toString();
-    if (sortBy !== 'name') params.sort = sortBy;
-    
-    if (Object.keys(params).length > 0) {
-      setSearchParams(params);
-    } else {
-      setSearchParams({});
+    const savedScrollY = sessionStorage.getItem('homeScrollY');
+    if (savedScrollY) {
+      setTimeout(() => {
+        window.scrollTo(0, parseInt(savedScrollY));
+        sessionStorage.removeItem('homeScrollY');
+      }, 100);
     }
-  }, [selectedStore, currentPage, sortBy, isRestoringState]);
+  }, []);
 
   // Load products when params change
   useEffect(() => {
@@ -110,7 +89,7 @@ function HomePage() {
     } else {
       loadAllProducts(selectedStore, currentPage, sortBy);
     }
-  }, [searchParams, selectedStore, currentPage, sortBy]);
+  }, [searchParams]);
 
   const loadAllProducts = async (storeId: number | null, page: number, sort: string) => {
     setLoading(true);
@@ -142,19 +121,42 @@ function HomePage() {
     }
   };
 
+  const updateURLParams = (updates: any) => {
+    const params: any = { ...Object.fromEntries(searchParams) };
+    
+    Object.keys(updates).forEach(key => {
+      if (updates[key] !== null && updates[key] !== undefined && updates[key] !== '') {
+        params[key] = updates[key].toString();
+      } else {
+        delete params[key];
+      }
+    });
+    
+    // Remove defaults
+    if (params.page === '1') delete params.page;
+    if (params.sort === 'name') delete params.sort;
+    
+    setSearchParams(params);
+  };
+
   const handleStoreFilter = (storeId: number | null) => {
-    setSelectedStore(storeId);
-    setCurrentPage(1);
+    updateURLParams({ store: storeId, page: null });
   };
 
   const handleSortChange = (newSort: string) => {
-    setSortBy(newSort);
-    setCurrentPage(1);
+    updateURLParams({ sort: newSort, page: null });
   };
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    updateURLParams({ page: page > 1 ? page : null });
+  };
+
+  const handleQueryChange = (newQuery: string) => {
+    setQuery(newQuery);
+    // Debounce URL update
+    setTimeout(() => {
+      updateURLParams({ q: newQuery || null, page: null });
+    }, 300);
   };
 
   return (
@@ -163,7 +165,7 @@ function HomePage() {
         <input
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => handleQueryChange(e.target.value)}
           placeholder="Search products (e.g., iPhone, Samsung TV, laptop...)"
           className="search-input"
         />
