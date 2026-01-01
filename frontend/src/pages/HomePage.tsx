@@ -70,16 +70,18 @@ function HomePage() {
     setQuery(q);
   }, [searchParams]);
 
-  // Restore scroll position when navigating back
+  // Restore scroll position when navigating back and results are loaded
   useEffect(() => {
-    const savedScrollY = sessionStorage.getItem('homeScrollY');
-    if (savedScrollY) {
-      setTimeout(() => {
-        window.scrollTo(0, parseInt(savedScrollY));
-        sessionStorage.removeItem('homeScrollY');
-      }, 100);
+    if (!loading && results) {
+      const savedScrollY = sessionStorage.getItem('homeScrollY');
+      if (savedScrollY) {
+        setTimeout(() => {
+          window.scrollTo(0, parseInt(savedScrollY));
+          sessionStorage.removeItem('homeScrollY');
+        }, 100);
+      }
     }
-  }, []);
+  }, [loading, results]);
 
   // Load products when params change
   useEffect(() => {
