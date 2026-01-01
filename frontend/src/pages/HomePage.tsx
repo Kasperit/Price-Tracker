@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { useSearchParams, useLocation } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { searchProducts, getProducts, getStores, Store, SearchResponse } from '../api';
 import ProductCard from '../components/ProductCard';
 
 function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const location = useLocation();
   const scrollPositions = useRef<Map<string, number>>(new Map());
   const debounceTimer = useRef<number | null>(null);
   
