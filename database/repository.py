@@ -58,12 +58,21 @@ class ProductRepository:
         ).first()
     
     def get_all(self, store_id: Optional[int] = None, 
-                limit: int = 50, offset: int = 0) -> list[Product]:
+                limit: int = 50, offset: int = 0, sort_by: str = "name") -> list[Product]:
         """Get all products with optional store filter."""
         q = self.db.query(Product)
         if store_id:
             q = q.filter(Product.store_id == store_id)
-        return q.order_by(Product.name).offset(offset).limit(limit).all()
+        
+        # Apply sorting
+        if sort_by == "price_asc":
+            q = q.outerjoin(PriceHistory).group_by(Product.id).order_by(func.max(PriceHistory.scraped_at).desc(), func.max(PriceHistory.price).asc())
+        elif sort_by == "price_desc":
+            q = q.outerjoin(PriceHistory).group_by(Product.id).order_by(func.max(PriceHistory.scraped_at).desc(), func.max(PriceHistory.price).desc())
+        else:  # name or default
+            q = q.order_by(Product.name)
+        
+        return q.offset(offset).limit(limit).all()
     
     def count_all(self, store_id: Optional[int] = None) -> int:
         """Count all products with optional store filter."""
@@ -73,14 +82,23 @@ class ProductRepository:
         return q.scalar() or 0
     
     def search(self, query: str, store_id: Optional[int] = None, 
-               limit: int = 50, offset: int = 0) -> list[Product]:
+               limit: int = 50, offset: int = 0, sort_by: str = "name") -> list[Product]:
         """Search products by name."""
         q = self.db.query(Product).filter(
             Product.name.ilike(f"%{query}%")
         )
         if store_id:
             q = q.filter(Product.store_id == store_id)
-        return q.order_by(Product.name).offset(offset).limit(limit).all()
+        
+        # Apply sorting
+        if sort_by == "price_asc":
+            q = q.outerjoin(PriceHistory).group_by(Product.id).order_by(func.max(PriceHistory.scraped_at).desc(), func.max(PriceHistory.price).asc())
+        elif sort_by == "price_desc":
+            q = q.outerjoin(PriceHistory).group_by(Product.id).order_by(func.max(PriceHistory.scraped_at).desc(), func.max(PriceHistory.price).desc())
+        else:  # name or default
+            q = q.order_by(Product.name)
+        
+        return q.offset(offset).limit(limit).all()
     
     def count_search(self, query: str, store_id: Optional[int] = None) -> int:
         """Count search results."""

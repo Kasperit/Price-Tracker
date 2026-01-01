@@ -1,19 +1,36 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { searchProducts, getProducts, getStores, Store, SearchResponse } from '../api';
 import ProductCard from '../components/ProductCard';
 
 function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  
+  // Restore state from location state if returning from product page
+  const initialPage = (location.state as any)?.page || parseInt(searchParams.get('page') || '1');
+  const initialSortBy = (location.state as any)?.sortBy || searchParams.get('sort') || 'name';
+  const initialScrollY = (location.state as any)?.scrollY || 0;
+  
   const [query, setQuery] = useState(searchParams.get('q') || '');
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStore, setSelectedStore] = useState<number | null>(
     searchParams.get('store') ? parseInt(searchParams.get('store')!) : null
   );
+  const [sortBy, setSortBy] = useState<string>(initialSortBy);
   const [results, setResults] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(initialPage);
+
+  // Restore scroll position when returning from product page
+  useEffect(() => {
+    if (initialScrollY > 0) {
+      window.scrollTo(0, initialScrollY);
+      // Clear the scroll position from location state
+      window.history.replaceState({}, '');
+    }
+  }, []);
 
   // Load stores on mount
   useEffect(() => {
@@ -26,37 +43,57 @@ function HomePage() {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       setCurrentPage(1);
+      const params: any = {};
       if (query.length >= 1) {
-        setSearchParams({ q: query, ...(selectedStore && { store: selectedStore.toString() }) });
-      } else if (query.length === 0) {
-        // Clear search and show all products
-        if (selectedStore) {
-          setSearchParams({ store: selectedStore.toString() });
-        } else {
-          setSearchParams({});
-        }
+        params.q = query;
+      }
+      if (selectedStore) {
+        params.store = selectedStore.toString();
+      }
+      if (sortBy !== 'name') {
+        params.sort = sortBy;
+      }
+      if (Object.keys(params).length > 0) {
+        setSearchParams(params);
+      } else {
+        setSearchParams({});
       }
     }, 300); // 300ms debounce
 
     return () => clearTimeout(timeoutId);
   }, [query]);
 
+  // Update URL params when filters change
+  useEffect(() => {
+    const params: any = {};
+    if (query) params.q = query;
+    if (selectedStore) params.store = selectedStore.toString();
+    if (currentPage > 1) params.page = currentPage.toString();
+    if (sortBy !== 'name') params.sort = sortBy;
+    
+    if (Object.keys(params).length > 0) {
+      setSearchParams(params);
+    } else {
+      setSearchParams({});
+    }
+  }, [selectedStore, currentPage, sortBy]);
+
   // Load products when params change
   useEffect(() => {
     const q = searchParams.get('q');
     if (q && q.length >= 1) {
-      performSearch(q, selectedStore, currentPage);
+      performSearch(q, selectedStore, currentPage, sortBy);
     } else {
-      loadAllProducts(selectedStore, currentPage);
+      loadAllProducts(selectedStore, currentPage, sortBy);
     }
-  }, [searchParams, selectedStore, currentPage]);
+  }, [searchParams, selectedStore, currentPage, sortBy]);
 
-  const loadAllProducts = async (storeId: number | null, page: number) => {
+  const loadAllProducts = async (storeId: number | null, page: number, sort: string) => {
     setLoading(true);
     setError(null);
     
     try {
-      const data = await getProducts(storeId || undefined, page);
+      const data = await getProducts(storeId || undefined, page, 20, sort);
       setResults(data);
     } catch (err) {
       setError('Failed to load products. Please try again.');
@@ -66,12 +103,12 @@ function HomePage() {
     }
   };
 
-  const performSearch = async (q: string, storeId: number | null, page: number) => {
+  const performSearch = async (q: string, storeId: number | null, page: number, sort: string) => {
     setLoading(true);
     setError(null);
     
     try {
-      const data = await searchProducts(q, storeId || undefined, page);
+      const data = await searchProducts(q, storeId || undefined, page, 20, sort);
       setResults(data);
     } catch (err) {
       setError('Failed to search products. Please try again.');
@@ -84,19 +121,11 @@ function HomePage() {
   const handleStoreFilter = (storeId: number | null) => {
     setSelectedStore(storeId);
     setCurrentPage(1);
-    if (query) {
-      setSearchParams({ 
-        q: query, 
-        ...(storeId && { store: storeId.toString() }) 
-      });
-    } else {
-      // Clear search params when no query, just filter by store
-      if (storeId) {
-        setSearchParams({ store: storeId.toString() });
-      } else {
-        setSearchParams({});
-      }
-    }
+  };
+
+  const handleSortChange = (newSort: string) => {
+    setSortBy(newSort);
+    setCurrentPage(1);
   };
 
   const handlePageChange = (page: number) => {
@@ -132,6 +161,22 @@ function HomePage() {
                 {store.name}
               </button>
             ))}
+          </div>
+        )}
+
+        {results && results.items.length > 0 && (
+          <div className="sort-container">
+            <label htmlFor="sort-select">Sort by:</label>
+            <select 
+              id="sort-select"
+              value={sortBy} 
+              onChange={(e) => handleSortChange(e.target.value)}
+              className="sort-select"
+            >
+              <option value="name">Name (A-Z)</option>
+              <option value="price_asc">Price (Low to High)</option>
+              <option value="price_desc">Price (High to Low)</option>
+            </select>
           </div>
         )}
       </div>

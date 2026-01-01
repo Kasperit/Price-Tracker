@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { ProductListItem } from '../api';
 
 interface ProductCardProps {
@@ -6,6 +6,9 @@ interface ProductCardProps {
 }
 
 function ProductCard({ product }: ProductCardProps) {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  
   const formatPrice = (price: number | null) => {
     if (price === null) return 'N/A';
     return new Intl.NumberFormat('fi-FI', {
@@ -14,9 +17,26 @@ function ProductCard({ product }: ProductCardProps) {
     }).format(price);
   };
 
+  // Save current state to restore when navigating back
+  const handleClick = () => {
+    const currentPage = parseInt(searchParams.get('page') || '1');
+    const currentSort = searchParams.get('sort') || 'name';
+    const scrollY = window.scrollY;
+    
+    return {
+      page: currentPage,
+      sortBy: currentSort,
+      scrollY: scrollY,
+    };
+  };
+
   return (
     <div className="product-card">
-      <Link to={`/product/${product.id}`} className="product-card-link">
+      <Link 
+        to={`/product/${product.id}`} 
+        className="product-card-link"
+        state={handleClick()}
+      >
         <div className="product-image-container">
           {product.image_url ? (
             <img

@@ -57,13 +57,14 @@ async def list_products(
     store_id: Optional[int] = Query(None, description="Filter by store ID"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+    sort_by: str = Query("name", description="Sort by: name, price_asc, price_desc"),
     db: Session = Depends(get_db)
 ):
     """List all products with optional store filter."""
     repo = ProductRepository(db)
     offset = (page - 1) * page_size
     
-    products = repo.get_all(store_id=store_id, limit=page_size, offset=offset)
+    products = repo.get_all(store_id=store_id, limit=page_size, offset=offset, sort_by=sort_by)
     total = repo.count_all(store_id=store_id)
     
     # Add latest price and store name to each product
@@ -102,13 +103,14 @@ async def search_products(
     store_id: Optional[int] = Query(None, description="Filter by store ID"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+    sort_by: str = Query("name", description="Sort by: name, price_asc, price_desc"),
     db: Session = Depends(get_db)
 ):
     """Search products by name."""
     repo = ProductRepository(db)
     offset = (page - 1) * page_size
     
-    products = repo.search(q, store_id=store_id, limit=page_size, offset=offset)
+    products = repo.search(q, store_id=store_id, limit=page_size, offset=offset, sort_by=sort_by)
     total = repo.count_search(q, store_id=store_id)
     
     # Add latest price and store name to each product

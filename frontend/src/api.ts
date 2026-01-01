@@ -80,11 +80,13 @@ export const getStores = async (): Promise<Store[]> => {
 export const getProducts = async (
   storeId?: number,
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = 20,
+  sortBy: string = 'name'
 ): Promise<SearchResponse> => {
   const params: Record<string, string | number> = {
     page,
     page_size: pageSize,
+    sort_by: sortBy,
   };
   if (storeId) {
     params.store_id = storeId;
@@ -97,12 +99,14 @@ export const searchProducts = async (
   query: string,
   storeId?: number,
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = 20,
+  sortBy: string = 'name'
 ): Promise<SearchResponse> => {
   const params: Record<string, string | number> = {
     q: query,
     page,
     page_size: pageSize,
+    sort_by: sortBy,
   };
   if (storeId) {
     params.store_id = storeId;
