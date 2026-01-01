@@ -7,6 +7,7 @@ function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const scrollPositions = useRef<Map<string, number>>(new Map());
+  const debounceTimer = useRef<number | null>(null);
   
   const [query, setQuery] = useState(searchParams.get('q') || '');
   const [stores, setStores] = useState<Store[]>([]);
@@ -157,8 +158,14 @@ function HomePage() {
 
   const handleQueryChange = (newQuery: string) => {
     setQuery(newQuery);
+    
+    // Clear previous timeout
+    if (debounceTimer.current !== null) {
+      clearTimeout(debounceTimer.current);
+    }
+    
     // Debounce URL update - only update if 2+ characters or empty
-    setTimeout(() => {
+    debounceTimer.current = window.setTimeout(() => {
       if (newQuery.length >= 2 || newQuery.length === 0) {
         updateURLParams({ q: newQuery || null, page: null });
       }
