@@ -1,4 +1,4 @@
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ProductListItem } from '../api';
 
 interface ProductCardProps {
@@ -6,7 +6,6 @@ interface ProductCardProps {
 }
 
 function ProductCard({ product }: ProductCardProps) {
-  const location = useLocation();
   const [searchParams] = useSearchParams();
   
   const formatPrice = (price: number | null) => {
