@@ -53,19 +53,23 @@ function PriceChart({ history }: PriceChartProps) {
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={data}
-          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+          margin={{ top: 5, right: 10, left: -10, bottom: 5 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 12, fill: '#64748b' }}
+            tick={{ fontSize: 11, fill: '#64748b' }}
             tickLine={{ stroke: '#e2e8f0' }}
+            angle={-45}
+            textAnchor="end"
+            height={60}
           />
           <YAxis
             domain={[yMin, yMax]}
             tickFormatter={formatPrice}
-            tick={{ fontSize: 12, fill: '#64748b' }}
+            tick={{ fontSize: 11, fill: '#64748b' }}
             tickLine={{ stroke: '#e2e8f0' }}
+            width={45}
           />
           <Tooltip
             formatter={(value: number) => [formatPrice(value), 'Price']}
@@ -73,6 +77,7 @@ function PriceChart({ history }: PriceChartProps) {
               backgroundColor: 'white',
               border: '1px solid #e2e8f0',
               borderRadius: '8px',
+              fontSize: '12px',
             }}
           />
           <ReferenceLine
@@ -82,7 +87,7 @@ function PriceChart({ history }: PriceChartProps) {
             label={{
               value: `Avg: ${formatPrice(avgPrice)}`,
               position: 'right',
-              fontSize: 11,
+              fontSize: 10,
               fill: '#64748b',
             }}
           />
@@ -91,8 +96,8 @@ function PriceChart({ history }: PriceChartProps) {
             dataKey="price"
             stroke="#2563eb"
             strokeWidth={2}
-            dot={{ fill: '#2563eb', strokeWidth: 2, r: 4 }}
-            activeDot={{ r: 6, fill: '#1d4ed8' }}
+            dot={{ fill: '#2563eb', strokeWidth: 2, r: 3 }}
+            activeDot={{ r: 5, fill: '#1d4ed8' }}
           />
         </LineChart>
       </ResponsiveContainer>

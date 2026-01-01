@@ -436,3 +436,130 @@ a:hover {
 .back-link:hover {
   color: var(--primary-color);
 }
+
+/* Price history table */
+.price-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow-x: auto;
+  display: block;
+}
+
+.price-history-table thead {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.price-history-table th {
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.price-history-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 1rem;
+  }
+
+  .header {
+    padding: 1rem;
+  }
+
+  .product-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .product-detail-info {
+    padding: 1.25rem;
+  }
+
+  .product-detail-name {
+    font-size: 1.25rem;
+  }
+
+  .product-detail-price {
+    font-size: 1.5rem;
+  }
+
+  .price-history-section {
+    padding: 1rem;
+    overflow-x: hidden;
+  }
+
+  .section-title {
+    font-size: 1.125rem;
+  }
+
+  .price-chart-container {
+    height: 250px;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    width: calc(100% + 2rem);
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .stat-card {
+    padding: 0.75rem;
+  }
+
+  .stat-label {
+    font-size: 0.7rem;
+  }
+
+  .stat-value {
+    font-size: 1rem;
+  }
+
+  /* Make table responsive - card layout on mobile */
+  .price-history-table {
+    display: block;
+    overflow-x: visible;
+  }
+
+  .price-history-table thead {
+    display: none;
+  }
+
+  .price-history-table tbody {
+    display: block;
+  }
+
+  .price-history-table tr {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    background-color: var(--bg-color);
+  }
+
+  .price-history-table td {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border: none;
+  }
+
+  .price-history-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+
+  .price-history-table td:not(:last-child) {
+    border-bottom: 1px solid var(--border-color);
+  }
+}

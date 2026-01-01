@@ -159,27 +159,27 @@ function ProductPage() {
 
         {product.price_history.length > 0 && (
           <div style={{ marginTop: '1.5rem' }}>
-            <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>Price History Table</h3>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>Price History Table</h3>
+            <table className="price-history-table">
               <thead>
-                <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <th style={{ padding: '0.5rem', textAlign: 'left' }}>Date</th>
-                  <th style={{ padding: '0.5rem', textAlign: 'right' }}>Price</th>
-                  <th style={{ padding: '0.5rem', textAlign: 'right' }}>Original</th>
-                  <th style={{ padding: '0.5rem', textAlign: 'right' }}>Discount</th>
+                <tr>
+                  <th>Date</th>
+                  <th style={{ textAlign: 'right' }}>Price</th>
+                  <th style={{ textAlign: 'right' }}>Original</th>
+                  <th style={{ textAlign: 'right' }}>Discount</th>
                 </tr>
               </thead>
               <tbody>
                 {product.price_history.slice(0, 12).map((ph) => (
-                  <tr key={ph.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '0.5rem' }}>{formatDate(ph.scraped_at)}</td>
-                    <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600 }}>
+                  <tr key={ph.id}>
+                    <td data-label="Date">{formatDate(ph.scraped_at)}</td>
+                    <td data-label="Price" style={{ textAlign: 'right', fontWeight: 600 }}>
                       {formatPrice(ph.price)}
                     </td>
-                    <td style={{ padding: '0.5rem', textAlign: 'right', color: '#64748b' }}>
+                    <td data-label="Original" style={{ textAlign: 'right', color: '#64748b' }}>
                       {ph.original_price ? formatPrice(ph.original_price) : '-'}
                     </td>
-                    <td style={{ padding: '0.5rem', textAlign: 'right', color: '#22c55e' }}>
+                    <td data-label="Discount" style={{ textAlign: 'right', color: '#22c55e' }}>
                       {ph.discount_percentage ? `${ph.discount_percentage}%` : '-'}
                     </td>
                   </tr>
